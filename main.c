@@ -30,6 +30,38 @@ void add_history(char *unused) {}
 #include <editline/history.h>
 #endif
 
+/* use operator string to see which operation to perform */
+long eval_op(long x, char* op, long y) {
+    if (strcmp(op, "+") == 0) {return x + y;}
+    if (strcmp(op, "-") == 0) {return x - y;}
+    if (strcmp(op, "*") == 0) {return x * y;}
+    if (strcmp(op, "/") == 0) {return x / y;}
+    return 0;
+}
+
+long eval(mpc_ast_t *t) {
+
+    // if tagged as number return directly
+    if (strstr(t->tag, "number")) {
+        return atoi(t->contents);
+    }
+
+    // since the operator is always the second child:
+    char *op = t->children[1]->contents;
+
+    // store the third child in 'x'
+    long x = eval(t->children[2]);
+
+    // iterate through remaining children and combine
+    int i = 3;
+    while(strstr(t->children[i]->tag, "expr")) {
+        x = eval_op(x, op, eval(t->children[i]));
+        i++;
+    }
+
+    return x;
+}
+
 
 int main (int argc, char **argv) {
 
@@ -49,7 +81,7 @@ int main (int argc, char **argv) {
 
 
     puts("Lispy Version 0.1");
-    puts("Press Ctrl+C to escape\n");
+    puts("Press Ctrl+C to escape\n");  
 
 
     while (1) {
@@ -60,6 +92,7 @@ int main (int argc, char **argv) {
 
         mpc_result_t r;
         // pass user input
+
 
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
             mpc_ast_print(r.output);
