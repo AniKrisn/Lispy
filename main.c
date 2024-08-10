@@ -22,6 +22,7 @@ char *readline(char *prompt) {
 }
 
 
+//??
 void add_history(char *unused) {}
 
 
@@ -52,7 +53,7 @@ long eval(mpc_ast_t *t) {
     // store the third child in 'x'
     long x = eval(t->children[2]);
 
-    // iterate through remaining children and combine
+    // recursively iterate through remaining children and combine. this is really cool
     int i = 3;
     while(strstr(t->children[i]->tag, "expr")) {
         x = eval_op(x, op, eval(t->children[i]));
@@ -72,10 +73,10 @@ int main (int argc, char **argv) {
 
     mpca_lang(MPCA_LANG_DEFAULT,
     "                                                     \
-      number   : /-?[0-9]+/ ;                             \
-      operator : '+' | '-' | '*' | '/' ;                  \
-      expr     : <number> | '(' <operator> <expr>+ ')' ;  \
-      lispy    : /^/ <operator> <expr>+ /$/ ;             \
+        number   : /-?[0-9]+/ ;                             \
+        operator : '+' | '-' | '*' | '/' ;                  \
+        expr     : <number> | '(' <operator> <expr>+ ')' ;  \
+        lispy    : /^/ <operator> <expr>+ /$/ ;             \
     ",
     Number, Operator, Expr, Lispy);
 
@@ -83,25 +84,25 @@ int main (int argc, char **argv) {
     puts("Lispy Version 0.1");
     puts("Press Ctrl+C to escape\n");  
 
-
     while (1) {
 
         char *input = readline("lispy> ");
-        add_history(input);
+
         // readline history is stored separately, primarily in the heap. Calling free() doesn't affect this; there are separate functions to read/write the readline history
+        add_history(input);
 
-        mpc_result_t r;
         // pass user input
-
-
+        mpc_result_t r;
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
-            mpc_ast_print(r.output);
+
+            long result = eval(r.output);
+            printf("li\n", result);
             mpc_ast_delete(r.output);
         } else {
             mpc_err_print(r.error);
             mpc_err_delete(r.error);
         }
-        // if successful, print and delete AST, else error
+        // if successful, eval & print, else error
 
         free(input);
     }
