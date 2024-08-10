@@ -96,7 +96,7 @@ int main (int argc, char **argv) {
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
 
             long result = eval(r.output);
-            printf("li\n", result);
+            printf("%li\n", result);
             mpc_ast_delete(r.output);
         } else {
             mpc_err_print(r.error);
