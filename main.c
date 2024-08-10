@@ -31,27 +31,69 @@ void add_history(char *unused) {}
 #include <editline/history.h>
 #endif
 
-/* use operator string to see which operation to perform */
-long eval_op(long x, char* op, long y) {
-    if (strcmp(op, "+") == 0) {return x + y;}
-    if (strcmp(op, "-") == 0) {return x - y;}
-    if (strcmp(op, "*") == 0) {return x * y;}
-    if (strcmp(op, "/") == 0) {return x / y;}
-    return 0;
+
+
+// def "lisp value" -- 
+typedef struct {
+    int type;
+    long num;
+    int err;
+} lval;
+// possible lval types
+enum { LVAL_NUM, LVAL_ERR };
+// possible err types
+enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
+// number type lval
+lval lval_num (long x) {
+    lval v;
+    v.type = LVAL_NUM;
+    v.num = x;
+    return v;
+}
+// err type lval
+lval lval_err(int x) {
+    lval v;
+    v.type = LVAL_ERR;
+    v.err = x;
+    return v;
 }
 
-long eval(mpc_ast_t *t) {
+
+/* use operator string to see which operation to perform */
+lval eval_op(lval x, char* op, lval y) {
+
+    // if either operands are errs return err
+    if (x.type == LVAL_ERR) { return x; }
+    if (y.type == LVAL_ERR) { return y; }
+    
+    if (strcmp(op, "+") == 0) {return lval_num(x.num + y.num);}
+    if (strcmp(op, "-") == 0) {return lval_num(x.num - y.num);}
+    if (strcmp(op, "*") == 0) {return lval_num(x.num * y.num);}
+    if (strcmp(op, "/") == 0) {
+        // if second operand is 0 return corresponding err
+        return y.num == 0
+        ? lval_err(LERR_DIV_ZERO)
+        : lval_num(x.num / y.num);
+        
+    }
+    
+    return lval_err(LERR_BAD_OP);
+}
+
+lval eval(mpc_ast_t *t) {
 
     // if tagged as number return directly
     if (strstr(t->tag, "number")) {
-        return atoi(t->contents);
+        errno = 0;
+        long x = strtol(t->contents, NULL, 10);
+        return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
     }
 
     // since the operator is always the second child:
-    char *op = t->children[1]->contents;
+    char *op = t->children[1]->contents;    
 
     // store the third child in 'x'
-    long x = eval(t->children[2]);
+    lval x = eval(t->children[2]);
 
     // recursively iterate through remaining children and combine. this is really cool
     int i = 3;
@@ -63,36 +105,6 @@ long eval(mpc_ast_t *t) {
     return x;
 }
 
-
-// def "lisp value" -- 
-typedef struct {
-    int type;
-    long num;
-    int err;
-} lval;
-
-
-// possible lval types
-enum { LVAL_NUM, LVAL_ERR };
-
-// possible err types
-enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
-
-// number type lval
-lval lval_num (long x) {
-    lval v;
-    v.type = LVAL_NUM;
-    v.num = x;
-    return v;
-}
-
-// err type lval
-lval lval_err(int x) {
-    lval v;
-    v.type = LVAL_ERR;
-    v.err = x;
-    return v;
-}
 
 // print an lval
 void lval_print(lval v) {
@@ -143,8 +155,8 @@ int main (int argc, char **argv) {
         mpc_result_t r;
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
 
-            long result = eval(r.output);
-            printf("%li\n", result);
+            lval result = eval(r.output);
+            lval_println(result);
             mpc_ast_delete(r.output);
         } else {
             mpc_err_print(r.error);
