@@ -9,16 +9,14 @@ static char buffer[2048];
 
 char *readline(char *prompt) {
     fputs(prompt, stdout);
-    fgets(buffer, sizeof(buffer), stdin);
-    // fgets reads in a string from the file stream and stores it in the buffer array
-    char *cpy = malloc(strlen(buffer+1));
-    // we use strlen(buffer) rather than sizeof(buffer) here because the latter would allocate the entire length of the array and the string is likely far smaller
-    strcpy(cpy, buffer);
-    // destination is the first arg. Same with fgets above
-    cpy[strlen(cpy)-1] = '\0';
-    // fgets, like puts, appends a newline character at the end of the string when it stores it in the buffer array. We replace this newline character with a null terminator
-    // remember that e.g strlen of "hello/n" is 6, and the index of '\n' is 5. That's why strlen-1
-    return cpy;
+    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+        return NULL;  // Handle EOF or error
+    }
+    size_t len = strlen(buffer);
+    if (len > 0 && buffer[len-1] == '\n') {
+        buffer[len-1] = '\0';  // Remove newline in-place
+    }
+    return strdup(buffer);  // Create a new copy and return it
 }
 
 
