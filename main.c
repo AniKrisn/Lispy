@@ -37,26 +37,51 @@ void add_history(char *unused) {}
 typedef struct {
     int type;
     long num;
-    int err;
+    // err and symbol types have string data
+    char *err;
+    char *sym;
+    // count and point to a list of "lval*"
+    int count;
+    struct lval **cell;
 } lval;
+
 // possible lval types
-enum { LVAL_NUM, LVAL_ERR };
+enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR };
 // possible err types
 enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
-// number type lval
-lval lval_num (long x) {
-    lval v;
-    v.type = LVAL_NUM;
-    v.num = x;
+
+// construct a pointer to a new num lval
+lval *lval_num (long x) {
+    lval *v = malloc(sizeof(lval));
+    v->type = LVAL_NUM;
+    v->num = x;
     return v;
 }
-// err type lval
-lval lval_err(int x) {
-    lval v;
-    v.type = LVAL_ERR;
-    v.err = x;
+// construct a pointer to a new err lval
+lval *lval_err(char *m) {
+    lval *v = malloc(sizeof(lval));
+    v->type = LVAL_ERR;
+    v->err = malloc(strlen(m) + 1);
+    strcpy(v->err, m);
+    return v; 
+}
+// construct a pointer to a new sym lval
+lval *lval_sym(char *s) {
+    lval *v = malloc(sizeof(lval));
+    v->type = LVAL_SYM;
+    v->sym = malloc(strlen(s) + 1);
+    strcpy(v->sym, s);
     return v;
 }
+// a pointer to a new empty sexpr lval
+lval *lval_sexpr(void) {
+    lval *v = malloc(sizeof(lval));
+    v->type = LVAL_SEXPR;
+    v->count = 0;
+    v->cell = NULL;
+    return v;
+}
+
 
 
 /* use operator string to see which operation to perform */
