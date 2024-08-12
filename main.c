@@ -80,6 +80,31 @@ lval *lval_sexpr(void) {
     return v;
 }
 
+// 
+void lval_del(lval *v) {
+    switch (v->type) {
+        // for nums the type is long so nothing special
+        case LVAL_NUM: break;
+        // err and sym are strings so freeing is straightforward
+        case LVAL_ERR: free(v->err); break;
+        case LVAL_SYM: free(v->sym); break;
+        // sexprs are lists so we need to free each element and then the mem used to store the pointers
+        case LVAL_SEXPR:
+            for (int i = 0; i < v->count; i++) {
+                lval_del(v->cell[i]);
+            }
+            free(v->cell);
+        break;
+    }
+    // free the mem used to store the lval struct
+    free(v);
+}
+
+
+
+
+
+
 
 
 /* use operator string to see which operation to perform */
