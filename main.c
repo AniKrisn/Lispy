@@ -186,22 +186,30 @@ lval eval(mpc_ast_t *t) {
 }
 
 
+// for sexprs
+void lval_expr_print(lval *v, char open, char close) {
+    putchar(open);
+    for (int i = 0; i < v->count; i++) {
+        lval_print(v->cell[i]);
+        if (i != v->count - 1) {
+            putchar(' ');
+        }
+    }
+    putchar(close);
+}
+
+
 // print an lval
-void lval_print(lval v) {
-    switch (v.type) {
-        case LVAL_NUM: printf("%li", v.num); break;
-        case LVAL_ERR:
-            if (v.err == LERR_DIV_ZERO) {
-                printf("Error: Division by Zero!");
-            }
-            if (v.err == LERR_BAD_NUM) {
-                printf("Error: Invalid Number!");
-            }
-        break;
+void lval_print(lval *v) {
+    switch (v->type) {
+        case LVAL_NUM: printf("%li", v->num); break;
+        case LVAL_ERR: printf("Error: %s", v->err); break;
+        case LVAL_SYM: printf("%s", v->sym); break;
+        case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
     }
 }
 
-void lval_println(lval v) { lval_print(v); putchar('\n'); }
+void lval_println(lval *v) { lval_print(v); putchar('\n'); }
 
 
 int main (int argc, char **argv) {
