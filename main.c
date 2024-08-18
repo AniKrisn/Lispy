@@ -30,9 +30,8 @@ void add_history(char *unused) {}
 #endif
 
 
-
 // def "lisp value" -- 
-typedef struct {
+typedef struct lval {
     int type;
     long num;
     // err and symbol types have string data
@@ -45,8 +44,7 @@ typedef struct {
 
 // possible lval types
 enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR };
-// possible err types
-enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
+
 
 // construct a pointer to a new num lval
 lval *lval_num (long x) {
@@ -89,6 +87,7 @@ void lval_del(lval *v) {
         case LVAL_ERR: free(v->err); break;
         case LVAL_SYM: free(v->sym); break;
         // sexprs are lists so we need to free each element and then the mem used to store the pointers
+
         case LVAL_SEXPR:
             for (int i = 0; i < v->count; i++) {
                 lval_del(v->cell[i]);
@@ -103,7 +102,7 @@ void lval_del(lval *v) {
 lval lval_read_num(mpc_ast_t *t) {
     errno = 0;
     long x = strtol(t->contents, NULL, 10);
-    return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
+    return errno != ERANGE ? lval_num(x) : lval_err("invalid number");
 }
 
 lval *lval_read(mpc_ast_t *t) {
@@ -185,6 +184,8 @@ lval eval(mpc_ast_t *t) {
     return x;
 }
 
+// forward declaration, allows us to use lval_print before it is defined: sometimes lval_expr_print needs it
+void lval_print(lval *v);
 
 // for sexprs
 void lval_expr_print(lval *v, char open, char close) {
@@ -198,7 +199,6 @@ void lval_expr_print(lval *v, char open, char close) {
     putchar(close);
 }
 
-
 // print an lval
 void lval_print(lval *v) {
     switch (v->type) {
@@ -209,6 +209,7 @@ void lval_print(lval *v) {
     }
 }
 
+// print an lval followed by a newline
 void lval_println(lval *v) { lval_print(v); putchar('\n'); }
 
 
@@ -245,9 +246,10 @@ int main (int argc, char **argv) {
         mpc_result_t r;
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
 
-            lval result = eval(r.output);
-            lval_println(result);
-            mpc_ast_delete(r.output);
+            // lval result = eval(r.output);
+            lval *x = lval_read(r.output);
+            lval_println(x);
+            lval_del(x);
         } else {
             mpc_err_print(r.error);
             mpc_err_delete(r.error);
