@@ -5,6 +5,7 @@
 #ifdef _WIN32
 #include <string.h>
 
+
 static char buffer[2048];
 
 char *readline(char *prompt) {
@@ -30,7 +31,7 @@ void add_history(char *unused) {}
 #endif
 
 // possible lval types
-enum { LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_SEXPR };
+enum {LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_SEXPR};
 
 // def "lisp value" -- 
 typedef struct lval {
@@ -116,6 +117,7 @@ lval *lval_read_num(mpc_ast_t *t) {
 }
 
 lval *lval_read(mpc_ast_t *t) {
+
     // if the tag is a number or sym return a pointer to a num lval
     if (strstr(t->tag, "number")) { return lval_read_num(t); }
     if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
@@ -125,11 +127,17 @@ lval *lval_read(mpc_ast_t *t) {
     if (strcmp(t->tag, ">") == 0) {x = lval_sexpr();}
     if (strstr(t->tag, "sexpr"))  {x = lval_sexpr();}
 
+    if (x == NULL) {
+        return lval_err("unknown node");
+    }
+
     for (int i = 0; i < t->children_num; i++) {
         if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
         if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
         if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
-        x = lval_add(x, lval_read(t->children[i]));
+
+        lval *child = lval_read(t->children[i]);
+        x = lval_add(x, child);
     }
 
     return x;
@@ -206,8 +214,8 @@ int main (int argc, char **argv) {
         number   : /-?[0-9]+/ ;                             \
         symbol   : '+' | '-' | '*' | '/' ;                  \
         sexpr    : '(' <expr>* ')' ;                        \
-        expr     : <number> | <symbol> | <expr> ;  \
-        lispy    : /^/ <expr>* /$/ ;             \
+        expr     : <number> | <symbol> | <sexpr> ;          \
+        lispy    : /^/ <expr>* /$/ ;                        \
     ",
     Number, Symbol, Sexpr, Expr, Lispy);
 
