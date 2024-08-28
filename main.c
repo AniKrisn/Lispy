@@ -119,8 +119,8 @@ lval *lval_read_num(mpc_ast_t *t) {
 lval *lval_read(mpc_ast_t *t) {
 
     // if the tag is a number or sym return a pointer to a num lval
-    if (strstr(t->tag, "number")) { return lval_read_num(t); }
-    if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
+    if (strstr(t->tag, "number")) {return lval_read_num(t);}
+    if (strstr(t->tag, "symbol")) {return lval_sym(t->contents);}
 
     lval *x = NULL;
     // ">" is the root of the expression in the AST. If root or sexpr, create empty list
@@ -145,31 +145,108 @@ lval *lval_read(mpc_ast_t *t) {
 
 
 
-/* use operator string to see which operation to perform */
-/*
-lval eval_op(lval x, char* op, lval y) {
-
-    // if either operands are errs return err
-    if (x.type == LVAL_ERR) { return x; }
-    if (y.type == LVAL_ERR) { return y; }
-    
-    if (strcmp(op, "+") == 0) {return lval_num(x.num + y.num);}
-    if (strcmp(op, "-") == 0) {return lval_num(x.num - y.num);}
-    if (strcmp(op, "*") == 0) {return lval_num(x.num * y.num);}
-    if (strcmp(op, "/") == 0) {
-        // if second operand is 0 return corresponding err
-        return y.num == 0
-        ? lval_err("div 0")
-        : lval_num(x.num / y.num);
-        
+lval *lval_expr_sexpr(lval *v) {
+    // evaluate children
+    for (int i=0; i < v->count; i++) {
+        v->cell[i] = lval_eval(v->cell[i]);
     }
-    
-    return lval_err("bad number");
+
+    // error checking
+    for (int i=0; i < v->count; i++) {
+        if (v->cell[i]->type == LVAL_ERR) { return lval_take(v, i); }
+    }
+
+    // empty expression
+    if (v->count == 0) { return v; }
+
+    // single expression
+    if (v->count == 1) { return lval_take(v,0); }
+
+    // ensure first element is sym
+    lval *f = lval_pop(v, 0);
+    if (f->type != LVAL_SYM) {
+        lval_del(f); lval_del(v);
+        return lval_err("S-expression does not start with Symbol!")
+    }
+
+    lval *result = builtin_op(v, f->sym);
+    lval_del(f);
+    return result;
 }
-*/
 
 
+lval *lval_eval(lval *v) {
+    // evaluate S-expressions
+    if (v->type == LVAL_SEXPR) { return lval_expr_sexpr(v); }
+    // and all the other lval types remain the same
+    return v;
+}
 
+// pops out ith value and shifts rest upwards
+lval *lval_pop(lval *v, int i) {
+    lval *x = v->cell[i];
+
+    // use memmove here instead of memcopy in case destination and source overlap. Remember- params: destination, source, size.
+    memmove(&v->cell[i], &v->cell[i+1],
+        sizeof(lval*) * (v->count-i-1));
+
+    // reduce count and reallocate memory of popped value
+    v->count--;
+    v->cell = realloc(v->cell, sizeof(lval*) * v->count);
+
+    // return the popped value
+    return x;
+}
+
+
+// take is like pop but it deletes the rest of the array
+lval *lval_take(lval *v, int i) {
+    lval *x = lval_pop(v, i);
+    lval_del(x);
+    return x;
+}
+
+lval *builtin_op(lval *a, char *op) {
+    
+    for(int i=0; i < a->count; i++) {
+        if (a->cell[i]->type != LVAL_NUM) {
+            lval_del(a);
+            return lval_err("Cannot operate on non-number!")
+        }
+    }
+
+    // pop the first element
+    lval *x = lval_pop(a, 0)
+
+    // handle cases like "(- 5)" which should evaluate to "-5"
+    if ((strcmp(op, "-") == 0) && a->count == 0) {
+        x->num = -x->num;
+    }
+
+    // instead, while there are still cases remaining
+    // recursively pop the first of remaining args, evaluate, until no remaining args
+    while (a->count > 0) {
+
+        lval *y = lval_pop(a, 0);
+
+        if (strcmp(op, "+") == 0) { x->num += y->num; }
+        if (strcmp(op, "-") == 0) { x->num -= y->num; }
+        if (strcmp(op, "*") == 0) { x->num *= y->num; }
+        if (strcmp(op, "/") == 0) { 
+            if (y->num == 0) {
+                lval_del(x); lval_del(y);
+                x = lval_err("Division by Zero!");
+                break;
+            }
+            x->num /= y->num;   
+        }
+
+        lval_del(y);
+    }
+
+    lval_del(a);
+    return x;
+}
 
 
 // forward declaration, allows us to use lval_print before it is defined: sometimes lval_expr_print needs it
@@ -235,10 +312,9 @@ int main (int argc, char **argv) {
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
 
             // lval result = eval(r.output);
-            lval *x = lval_read(r.output);
+            lval *x = lval_evale(lval_read(r.output));
             lval_println(x);
             lval_del(x);
-            mpc_ast_delete(r.output);
         } else {
             mpc_err_print(r.error);
             mpc_err_delete(r.error);
