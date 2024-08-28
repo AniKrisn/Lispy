@@ -47,14 +47,14 @@ typedef struct lval {
 
 
 // init all types with constructor functions
-// construct a pointer to a new num lval
+
 lval *lval_num (long x) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_NUM;
     v->num = x;
     return v;
 }
-// construct a pointer to a new err lval
+
 lval *lval_err(char *m) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_ERR;
@@ -63,7 +63,7 @@ lval *lval_err(char *m) {
     strcpy(v->err, m);  
     return v; 
 }
-// construct a pointer to a new sym lval
+
 lval *lval_sym(char *s) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_SYM;
@@ -71,7 +71,7 @@ lval *lval_sym(char *s) {
     strcpy(v->sym, s);
     return v;
 }
-// a pointer to a new empty sexpr lval
+
 lval *lval_sexpr(void) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_SEXPR;
@@ -79,7 +79,7 @@ lval *lval_sexpr(void) {
     v->cell = NULL;
     return v;
 } 
-// a pointer to a new empty Qexpr lval
+
 lval *lval_qexpr(void) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_QEXPR;
@@ -127,39 +127,6 @@ lval *lval_read_num(mpc_ast_t *t) {
     long x = strtol(t->contents, NULL, 10);
     return errno != ERANGE ? lval_num(x) : lval_err("invalid number");
 }
-
-lval *lval_read(mpc_ast_t *t) {
-
-    // if the tag is a number or sym return a pointer to a num lval
-    if (strstr(t->tag, "number")) {return lval_read_num(t);}
-    if (strstr(t->tag, "symbol")) {return lval_sym(t->contents);}
-
-    lval *x = NULL;
-    // ">" is the root of the expression in the AST. If root or sexpr, create empty list
-    if (strcmp(t->tag, ">") == 0) {x = lval_sexpr();}
-    if (strstr(t->tag, "sexpr"))  {x = lval_sexpr();}
-    if (strstr(t->tag, "qexpr"))  {x = lval_qexpr();}
-
-
-    if (x == NULL) {
-        return lval_err("unknown node");
-    }
-
-    for (int i = 0; i < t->children_num; i++) {
-        if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
-        if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
-        if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
-        if (strcmp(t->children[i]->contents, "}") == 0) { continue; }        
-        if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
-
-        lval *child = lval_read(t->children[i]);
-        x = lval_add(x, child);
-    }
-
-    return x;
-}
-
-
 
 // pops out ith value and shifts rest upwards
 lval *lval_pop(lval *v, int i) {
@@ -293,12 +260,44 @@ void lval_print(lval *v) {
         case LVAL_SYM: printf("%s", v->sym); break;
         case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
         case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
-
     }
 }
 
 // print an lval followed by a newline
 void lval_println(lval *v) { lval_print(v); putchar('\n'); }
+
+
+
+lval *lval_read(mpc_ast_t *t) {
+
+    // if the tag is a number or sym return a pointer to a num lval
+    if (strstr(t->tag, "number")) {return lval_read_num(t);}
+    if (strstr(t->tag, "symbol")) {return lval_sym(t->contents);}
+
+    lval *x = NULL;
+    // ">" is the root of the expression in the AST. If root or sexpr, create empty list
+    if (strcmp(t->tag, ">") == 0) {x = lval_sexpr();}
+    if (strstr(t->tag, "sexpr"))  {x = lval_sexpr();}
+    if (strstr(t->tag, "qexpr"))  {x = lval_qexpr();}
+
+
+    if (x == NULL) {
+        return lval_err("unknown node");
+    }
+
+    for (int i = 0; i < t->children_num; i++) {
+        if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
+        if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
+        if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
+        if (strcmp(t->children[i]->contents, "}") == 0) { continue; }        
+        if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
+
+        lval *child = lval_read(t->children[i]);
+        x = lval_add(x, child);
+    }
+
+    return x;
+}
 
 
 int main (int argc, char **argv) {
@@ -311,13 +310,13 @@ int main (int argc, char **argv) {
     mpc_parser_t *Lispy  = mpc_new("lispy");
 
     mpca_lang(MPCA_LANG_DEFAULT,
-    "                                                       \
-        number   : /-?[0-9]+/ ;                             \
-        symbol   : '+' | '-' | '*' | '/' ;                  \
-        sexpr    : '(' <expr>* ')' ;                        \
-        qexpr    : '{' <expr>* '}' ;                        \
-        expr     : <number> | <symbol> | <sexpr> ;          \
-        lispy    : /^/ <expr>* /$/ ;                        \
+    "                                                        \
+        number   : /-?[0-9]+/ ;                              \
+        symbol   : '+' | '-' | '*' | '/' ;                   \
+        sexpr    : '(' <expr>* ')' ;                         \
+        qexpr    : '{' <expr>* '}' ;                         \
+        expr     : <number> | <symbol> | <sexpr> | <qexpr> ; \
+        lispy    : /^/ <expr>* /$/ ;                         \
     ",
     Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
 
