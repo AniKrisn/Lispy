@@ -59,6 +59,7 @@ lval *lval_err(char *m) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_ERR;
     v->err = malloc(strlen(m) + 1);
+    // the parameter is the error message. We copy that message to &v 
     strcpy(v->err, m);  
     return v; 
 }
@@ -145,43 +146,6 @@ lval *lval_read(mpc_ast_t *t) {
 
 
 
-lval *lval_expr_sexpr(lval *v) {
-    // evaluate children
-    for (int i=0; i < v->count; i++) {
-        v->cell[i] = lval_eval(v->cell[i]);
-    }
-
-    // error checking
-    for (int i=0; i < v->count; i++) {
-        if (v->cell[i]->type == LVAL_ERR) { return lval_take(v, i); }
-    }
-
-    // empty expression
-    if (v->count == 0) { return v; }
-
-    // single expression
-    if (v->count == 1) { return lval_take(v,0); }
-
-    // ensure first element is sym
-    lval *f = lval_pop(v, 0);
-    if (f->type != LVAL_SYM) {
-        lval_del(f); lval_del(v);
-        return lval_err("S-expression does not start with Symbol!")
-    }
-
-    lval *result = builtin_op(v, f->sym);
-    lval_del(f);
-    return result;
-}
-
-
-lval *lval_eval(lval *v) {
-    // evaluate S-expressions
-    if (v->type == LVAL_SEXPR) { return lval_expr_sexpr(v); }
-    // and all the other lval types remain the same
-    return v;
-}
-
 // pops out ith value and shifts rest upwards
 lval *lval_pop(lval *v, int i) {
     lval *x = v->cell[i];
@@ -206,17 +170,59 @@ lval *lval_take(lval *v, int i) {
     return x;
 }
 
+// forward declarations
+lval *lval_eval(lval *v);
+lval *builtin_op(lval *a, char *op);
+
+
+lval *lval_expr_sexpr(lval *v) {
+    // evaluate children
+    for (int i=0; i < v->count; i++) {
+        v->cell[i] = lval_eval(v->cell[i]);
+    }
+
+    // error checking
+    for (int i=0; i < v->count; i++) {
+        if (v->cell[i]->type == LVAL_ERR) { return lval_take(v, i); }
+    }
+
+    // empty expression
+    if (v->count == 0) { return v; }
+
+    // single expression
+    if (v->count == 1) { return lval_take(v,0); }
+
+    // ensure first element is sym
+    lval *f = lval_pop(v, 0);
+    if (f->type != LVAL_SYM) {
+        lval_del(f); lval_del(v);
+        return lval_err("S-expression does not start with Symbol!");
+    }
+
+    lval *result = builtin_op(v, f->sym);
+    lval_del(f);
+    return result;
+}
+
+
+lval *lval_eval(lval *v) {
+    // evaluate S-expressions
+    if (v->type == LVAL_SEXPR) { return lval_expr_sexpr(v); }
+    // and all the other lval types remain the same
+    return v;
+}
+
 lval *builtin_op(lval *a, char *op) {
     
     for(int i=0; i < a->count; i++) {
         if (a->cell[i]->type != LVAL_NUM) {
             lval_del(a);
-            return lval_err("Cannot operate on non-number!")
+            return lval_err("Cannot operate on non-number!");
         }
     }
 
     // pop the first element
-    lval *x = lval_pop(a, 0)
+    lval *x = lval_pop(a, 0);
 
     // handle cases like "(- 5)" which should evaluate to "-5"
     if ((strcmp(op, "-") == 0) && a->count == 0) {
@@ -312,7 +318,7 @@ int main (int argc, char **argv) {
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
 
             // lval result = eval(r.output);
-            lval *x = lval_evale(lval_read(r.output));
+            lval *x = lval_eval(lval_read(r.output));
             lval_println(x);
             lval_del(x);
         } else {
