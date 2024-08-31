@@ -162,9 +162,13 @@ lval *builtin(lval *a, char *func);
 
 
 lval *lval_expr_sexpr(lval *v) {
+    printf("Evaluating S-expression with %d children\n", v->count + 1); // Print number of children
+
     // evaluate children
     for (int i=0; i < v->count; i++) {
+        printf("Evaluating child %d\n", i); // Print which child is being evaluated
         v->cell[i] = lval_eval(v->cell[i]);
+        printf("Child %d evaluated\n", i); // Print after child evaluation
     }
 
     // error checking
@@ -186,12 +190,15 @@ lval *lval_expr_sexpr(lval *v) {
     }
 
     lval *result = builtin(v, f->sym);
+    printf("Result: %s\n", result);
     lval_del(f);
     return result;
 }
 
 
 lval *lval_eval(lval *v) {
+    printf("Evaluating lval of type: %d\n", v->type); 
+
     // evaluate S-expressions
     if (v->type == LVAL_SEXPR) { return lval_expr_sexpr(v); }
     // and all the other lval types remain the same
@@ -201,6 +208,14 @@ lval *lval_eval(lval *v) {
 
 
 // builtin functions for Sexpr and Qexpr
+
+lval *builtin_len(lval *a) {
+    LASSERT(a, a->cell[0]->type == LVAL_QEXPR, "Function 'head' passed incorrect type");
+    
+    int i = a->cell[0]->count;
+
+    return lval_num(i);
+}
 
 lval *builtin_head(lval *a) {
     LASSERT(a, a->count == 1, "Function passed too many args");
@@ -232,6 +247,7 @@ lval *builtin_eval(lval *a) {
     LASSERT(a, a->cell[0]->type == LVAL_QEXPR, "Function 'eval' passed incorrect type");
 
     lval *x = lval_take(a, 0);
+    printf("taken\n");
     x->type = LVAL_SEXPR;
     return lval_eval(x);
 }
@@ -303,12 +319,14 @@ lval *builtin_op(lval *a, char *op) {
 }
 
 
+
 lval *builtin(lval *a, char *func) {
     if (strcmp("list", func) == 0) { return builtin_list(a); }
     if (strcmp("head", func) == 0) { return builtin_head(a); }
     if (strcmp("tail", func) == 0) { return builtin_tail(a); }
     if (strcmp("join", func) == 0) { return builtin_join(a); }
     if (strcmp("eval", func) == 0) { return builtin_eval(a); }
+    if (strcmp("len", func) == 0) { return builtin_len(a); }
     if (strcmp("+-/*", func))  { return builtin_op(a, func); }
     lval_del(a);
     return lval_err("Unknown function!");
@@ -390,7 +408,8 @@ int main (int argc, char **argv) {
     "                                                        \
         number   : /-?[0-9]+/ ;                              \
         symbol   : \"list\" | \"head\" | \"tail\" |          \
-        \"join\" | \"eval\" | '+' | '-' | '*' | '/' ;        \
+        \"join\" | \"eval\" | \"len\" |'+' | '-' |          \
+        '*' | '/' ;                                          \
         sexpr    : '(' <expr>* ')' ;                         \
         qexpr    : '{' <expr>* '}' ;                         \
         expr     : <number> | <symbol> | <sexpr> | <qexpr> ; \
