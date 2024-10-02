@@ -24,7 +24,6 @@ char* readline(char* prompt) {
 }
 
 
-//??
 void add_history(char* unused) {}
 
 
@@ -224,6 +223,10 @@ lval* lenv_get(lenv* e, lval* k) {
             return lval_copy(e->vals[i]);
         }
     }
+
+    // if sym not found return error
+    return lval_err("unbound symbol!");
+
 }
 
 void lenv_put(lenv* e, lval* k, lval* v) {
@@ -259,6 +262,7 @@ lval* builtin(lenv* e, lval* a, char* func);
 
 /* Builtins */
 
+/*
 lval* builtin_len(lenv* e, lval* a) {
     LASSERT(a, a->cell[0]->type == LVAL_QEXPR, "Function 'len' passed incorrect type");
 
@@ -269,6 +273,7 @@ lval* builtin_len(lenv* e, lval* a) {
 
     return lval_num(total_count); 
 }
+*/
 
 lval* builtin_head(lenv* e, lval* a) {
     LASSERT(a, a->count == 1, "Function passed too many args");
@@ -300,7 +305,6 @@ lval* builtin_eval(lenv* e, lval* a) {
     LASSERT(a, a->cell[0]->type == LVAL_QEXPR, "Function 'eval' passed incorrect type");
 
     lval* x = lval_take(a, 0);
-    printf("taken\n");
     x->type = LVAL_SEXPR;
     return lval_eval(e, x);
 }
