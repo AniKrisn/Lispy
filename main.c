@@ -47,12 +47,15 @@ struct lval {
     // err and symbol types have string data
     char* err;
     char* sym;
-    lbuiltin fun;
+    lbuiltin builtin;   
+    lenv* env;
+    lval* formals;
+    lval* body;
     // count and point to a list of "lval*"
     int count;
     lval** cell;
 };
-
+  
 
 // init all types with constructor functions
 
@@ -103,7 +106,7 @@ lval* lval_sym(char* s) {
 lval* lval_fun(lbuiltin func) {
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_FUN;
-    v->fun = func;
+    v->builtin = func;
     return v;
 }
 
@@ -123,7 +126,23 @@ lval* lval_qexpr(void) {
     return v;
 }
 
+lenv* lenv_new(void);
+
+lval* lval_lambda(lval* formals, lval* body) {
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_FUN;
+
+    v->builtin = NULL;
+
+    v->env = lenv_new();
+
+    v->formals = formals;
+    v->body = body;
+    return v;
+}
+
 // destructor for lval, frees the memory used by the lval after used
+void lenv_del(lenv* e);
 void lval_del(lval* v) {
     switch (v->type) {
         // for nums the type is long so nothing special
@@ -132,14 +151,20 @@ void lval_del(lval* v) {
         case LVAL_ERR: free(v->err); break;
         case LVAL_SYM: free(v->sym); break;
         // sexprs are lists so we need to free each element and then the mem used to store the pointers
-        case LVAL_FUN: break;
-
         case LVAL_QEXPR:
         case LVAL_SEXPR:
             for (int i = 0; i < v->count; i++) {
                 lval_del(v->cell[i]);
             }
             free(v->cell);
+        break;
+
+        case LVAL_FUN:
+            if (!v->builtin) {
+                lenv_del(v->env);
+                lval_del(v->formals);
+                lval_del(v->body);
+            }
         break;
     }
     // free the mem used to store the lval struct
@@ -177,13 +202,13 @@ lval* lval_take(lval* v, int i) {
     return x;
 }
 
+lenv* lenv_copy(lenv* e);
 lval* lval_copy(lval* v) {
     lval* x = malloc(sizeof(lval));
     x->type = v->type;
 
     switch (v->type) {
         case LVAL_NUM: x->num = v->num; break;
-        case LVAL_FUN: x->fun = v->fun; break;
 
         case LVAL_ERR:
             x->err = malloc(strlen(v->err)+1);
@@ -199,6 +224,17 @@ lval* lval_copy(lval* v) {
             x->cell = malloc(sizeof(lval*) * x->count);
             for (int i=0; i < x->count; i++) {
                 x->cell[i] = lval_copy(v->cell[i]);
+            }
+        break;
+
+        case LVAL_FUN:
+            if (v->builtin) {
+                x->builtin = v->builtin;
+            } else {
+                x->builtin = NULL;
+                x->env = lenv_copy(v->env);
+                x->formals = lval_copy(v->formals);
+                x->body = lval_copy(v->body);
             }
         break;
     } 
@@ -356,7 +392,7 @@ lval* builtin_join(lenv* e, lval* a) {
 
 lval* builtin_op(lenv* e, lval* a, char* op) {
     
-    for(int i=0; i < a->count; i++) {
+    for (int i=0; i < a->count; i++) {
         if (a->cell[i]->type != LVAL_NUM) {
             lval_del(a);
             return lval_err("Cannot operate on non-number!");
@@ -434,13 +470,12 @@ lval* builtin_def(lenv* e, lval* a) {
     return lval_sexpr();
 }
 
-
-int exit_flag = 1;
-
+/*
+int exit_flag = 0;
 lval* builtin_exit(lenv* e, lval* a) {
-    exit_flag = 0;
+    exit_flag = 1;
 }
-
+*/
 
 // forward declaration, allows us to use lval_print before it is defined: sometimes lval_expr_print needs it
 void lval_print(lval* v);
@@ -463,7 +498,15 @@ void lval_print(lval* v) {
         case LVAL_NUM: printf("%li", v->num); break;
         case LVAL_ERR: printf("Error: %s", v->err); break;
         case LVAL_SYM: printf("%s", v->sym); break;
-        case LVAL_FUN: printf("<function>"); break;
+        case LVAL_FUN: 
+            if (v->builtin) {
+                printf("<builtin>");
+            } else {
+                printf("(\\"); 
+                lval_print(v->formals);
+                putchar(' '); lval_print(v->body); putchar(')');
+            }
+            break;
         case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
         case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
     }
@@ -487,7 +530,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "eval", builtin_eval);
     lenv_add_builtin(e, "join", builtin_join);
     lenv_add_builtin(e, "def", builtin_def);
-    lenv_add_builtin(e, "exit", builtin_exit);
+    // lenv_add_builtin(e, "exit", builtin_exit);
 
     lenv_add_builtin(e, "+", builtin_add);
     lenv_add_builtin(e, "-", builtin_sub);
@@ -521,7 +564,7 @@ lval* lval_expr_sexpr(lenv* e, lval* v) {
         return lval_err("S-expression does not start with Symbol!");
     }
 
-    lval* result = f->fun(e, v);
+    lval* result = f->builtin(e, v);
     lval_del(f);
     return result;
 }
@@ -605,7 +648,7 @@ int main (int argc, char** argv) {
     lenv* e = lenv_new();
     lenv_add_builtins(e);
     
-    while (exit_flag) {
+    while (1) {
 
         char* input = readline("lispy> ");
 
@@ -620,6 +663,15 @@ int main (int argc, char** argv) {
             lval* x = lval_eval(e, lval_read(r.output));
             lval_println(x);
             lval_del(x);
+
+            /*
+            if (exit_flag) {
+                puts("Exiting..");
+                free(input);
+                break;
+            }
+            */
+
         } else {
             mpc_err_print(r.error);
             mpc_err_delete(r.error);
