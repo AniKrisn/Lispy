@@ -5,20 +5,6 @@
 #ifdef _WIN32
 #include <string.h>
 
-#define LASSERT(args, cond, fmt, ...) \
-    if (!(cond)) { \
-        lval* err = lval_err(fmt, ##__VA_ARGS__); \
-        lval_del(args); \
-        return err; \
-    } 
-
-#define TYPE_CHECK(args, required_type, fmt, ...) \
-    if (args->cell[0]->type != required_type) { \
-        lval* err = lval_err(fmt, ##__VA_ARGS__); \
-        lval_del(args); \
-        return err; \
-    }
-
 
 static char buffer[2048];
 
@@ -290,28 +276,28 @@ lval* lval_eval(lenv* e, lval* v);
 lval* builtin_op(lenv* e, lval* a, char* op);
 lval* builtin(lenv* e, lval* a, char* func);
 
-
 /* Builtins */
 
-/*
-lval* builtin_len(lenv* e, lval* a) {
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPR, "Function 'len' passed incorrect type");
+#define LASSERT(args, cond, fmt, ...) \
+    if (!(cond)) {lval* err = lval_err(fmt, ##__VA_ARGS__); \
+    lval_del(args); return err;} 
 
-    int total_count = 0; 
-    for (int i = 0; i < a->cell[0]->count; i++) {
-        total_count++;
-    }
+#define LASSERT_TYPE(args, func, expected) \
+    LASSERT(args, args->cell[0]->type == expected, \
+    "Function '%s' passed incorrect type. Got %s, expected %s.", func, ltype_name(args->cell[0]->type), ltype_name(expected))
 
-    return lval_num(total_count); 
-}
-*/
+#define LASSERT_NUM(args, func, expected) \
+    LASSERT(args, args->count == expected, \
+    "Function '%s' passed incorrect type. Got %s, expected %s.", func, args->count, expected) 
+
+#define LASSERT_NOT_EMPTY(args, func) \
+    LASSERT(args, args->cell[0]->count != 0, "Function '%s' passed {}", func)
+
 
 lval* builtin_head(lenv* e, lval* a) {
-    LASSERT(a, a->count == 1, "Function 'head' passed too many args. Got %i, expected %i", a->count, 1);
-    LASSERT(a, a->cell[0]->count != 0, "Function 'head' passed {}")
-
-    TYPE_CHECK(a, LVAL_QEXPR, "Function 'head' passed incorrect type. Got %s, expected %s.",
-    ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
+    LASSERT_NUM(a, "head", 1);
+    LASSERT_TYPE(a, "head", LVAL_QEXPR);
+    LASSERT_NOT_EMPTY(a, "head");
 
     lval *v = lval_take(a, 0);
     while (v->count > 1) { lval_del(lval_pop(v, 1)); }
@@ -319,11 +305,9 @@ lval* builtin_head(lenv* e, lval* a) {
 }
 
 lval* builtin_tail(lenv* e, lval* a) {
-    LASSERT(a, a->count == 1, "Function passed too many args. Got %i, expected %i", a->count, 1);
-    LASSERT(a, a->cell[0]->count != 0, "Function 'tail' passed {}")
-
-    TYPE_CHECK(a, LVAL_QEXPR, "Function 'tail' passed incorrect type. Got %s, expected %s.",
-    ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
+    LASSERT_NUM(a, "tail", 1);
+    LASSERT_NOT_EMPTY(a, "tail");
+    LASSERT_TYPE(a, "tail", LVAL_QEXPR);
 
     lval* v = lval_take(a, 0);
     lval_del(lval_pop(v,0));
@@ -336,10 +320,8 @@ lval* builtin_list(lenv* e, lval* a) {
 }
 
 lval* builtin_eval(lenv* e, lval* a) {
-    LASSERT(a, a->count == 1, "Function 'eval' passed too many args. Got %i, expected %i", a->count, 1);
-
-    TYPE_CHECK(a, LVAL_QEXPR, "Function 'eval' passed incorrect type. Got %s, expected %s.",
-    ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
+    LASSERT_NUM(a, "eval", 1);
+    LASSERT_TYPE(a, "eval", LVAL_QEXPR);
 
     lval* x = lval_take(a, 0);
     x->type = LVAL_SEXPR;
@@ -356,9 +338,9 @@ lval* lval_join(lenv* e, lval* x, lval* y) {
 }
 
 lval* builtin_join(lenv* e, lval* a) {
+
     for (int i=0; i < a->count; i++) {
-        TYPE_CHECK(a, LVAL_QEXPR, "Function 'join' passed incorrect type. Got %s, expected %s.",
-        ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
+        LASSERT_TYPE(a, "join", LVAL_QEXPR);
     }
 
     lval* x = lval_pop(a, 0);
@@ -431,8 +413,7 @@ lval* builtin_div(lenv* e, lval* a) {
 }
 
 lval* builtin_def(lenv* e, lval* a) {
-    TYPE_CHECK(a, LVAL_QEXPR, "Function 'def' passed incorrect type. Got %s, expected %s.",
-    ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
+    LASSERT_TYPE(a, "def", LVAL_QEXPR);
 
     // first arg is symbol list
     lval* syms = a->cell[0];
@@ -451,6 +432,13 @@ lval* builtin_def(lenv* e, lval* a) {
     lval_del(a);
     // call lval_sexpr since creating new sexpr lval
     return lval_sexpr();
+}
+
+
+int exit_flag = 1;
+
+lval* builtin_exit(lenv* e, lval* a) {
+    exit_flag = 0;
 }
 
 
@@ -499,6 +487,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "eval", builtin_eval);
     lenv_add_builtin(e, "join", builtin_join);
     lenv_add_builtin(e, "def", builtin_def);
+    lenv_add_builtin(e, "exit", builtin_exit);
 
     lenv_add_builtin(e, "+", builtin_add);
     lenv_add_builtin(e, "-", builtin_sub);
@@ -616,7 +605,7 @@ int main (int argc, char** argv) {
     lenv* e = lenv_new();
     lenv_add_builtins(e);
     
-    while (1) {
+    while (exit_flag) {
 
         char* input = readline("lispy> ");
 
