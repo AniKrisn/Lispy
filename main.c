@@ -530,13 +530,6 @@ lval* builtin_put(lenv* e, lval* a) {
 }
 
 
-/*
-int exit_flag = 0;
-lval* builtin_exit(lenv* e, lval* a) {
-    exit_flag = 1;
-}
-*/
-
 // forward declaration, allows us to use lval_print before it is defined: sometimes lval_expr_print needs it
 void lval_print(lval* v);
 
@@ -618,6 +611,20 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
         // pop first symbol from formals
         lval* sym = lval_pop(f->formals, 0);
 
+        // special case to deal with '&'
+        if (strcmp(sym->sym, "&") == 0) {
+            if (f->formals->count != 1) {
+                lval_del(a);
+                return lval_err("Function format invalid. Symbol '&' not followed by single symbol.");
+            }
+
+            // next formal should be bound to remaining args
+            lval* nsym = lval_pop(f->formals, 0);
+            lenv_put(f->env, nsym, builtin_list(e, a));
+            lval_del(sym);  lval_del(nsym);
+            break;
+        }
+
         // pop next arg from the list
         lval* val = lval_pop(a, 0);
 
@@ -629,6 +636,23 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
     }
 
     lval_del(a);
+
+    if (f->formals->count > 0 &&
+        strcmp(f->formals->cell[0]->sym, "&") == 0) {
+            
+            if (f->formals->count != 2) {
+                return lval_err("Function format invalid. Symbol '&' not followed by single symbol.");
+            }
+    
+        lval_del(lval_pop(f->formals, 0));
+        
+        lval* sym = lval_pop(f->formals, 0);
+        lval* val = lval_qexpr();
+
+        lenv_put(f->env, sym, val);
+        lval_del(sym);  lval_del(val);
+    }   
+    
 
     // if all formals have been bound, evaluate
     if (f->formals->count == 0) {
@@ -763,6 +787,7 @@ int main (int argc, char** argv) {
 
         char* input = readline("lispy> ");
 
+        // enter 'exit' or 'quit' to break
         if (input == NULL || strcmp(input, "exit") == 0 || strcmp(input, "quit") == 0) {
             puts("Exiting..");
             free(input);
@@ -780,14 +805,6 @@ int main (int argc, char** argv) {
             lval* x = lval_eval(e, lval_read(r.output));
             lval_println(x);
             lval_del(x);
-
-            /*
-            if (exit_flag) {
-                puts("Exiting..");
-                free(input);
-                break;
-            }
-            */
 
         } else {
             mpc_err_print(r.error);
