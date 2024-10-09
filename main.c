@@ -339,51 +339,6 @@ void lenv_def(lenv* e, lval* k, lval* v) {
     lenv_put(e, k, v);
 }
 
-lval* lval_call(lenv* e, lval* f, lval* a) {
-    if (f->builtin) { return f->builtin(e,a); }
-
-    int given = a->count;
-    int total = f->formals->count;
-
-    // while args still left to be processed
-    while (a->count) {
-        // err check: no more formals to bind
-        if (f->formals->count == 0) {
-            lval_del(a); 
-            return lval_err("Function passed too many args. Got %i, expected %i",
-            given, total);
-        }
-
-        // pop first symbol from formals
-        lval* sym = lval_pop(f->formals, 0);
-
-        // pop next arg from the list
-        lval* val = lval_pop(a, 0);
-
-        // bind a copy into the function's env
-        lenv_put(f->env, sym, val);
-
-        // delete symbol, delete value
-        lval_del(sym);   lval_del(val);
-    }
-
-    lval_del(a);
-
-    // if all formals have been bound, evaluate
-    if (f->formals->count == 0) {
-        f->env->parent == e;
-
-        return builtin_eval(
-            f->env, lval_add(lval_sexpr(), lval_copy(f->body))
-        );
-    } 
-    // otherwise return partially evaluated function
-    else {
-        return lval_copy(f);
-    }
-
-}
-
 
 // forward declarations
 lval* lval_eval(lenv* e, lval* v);
@@ -501,30 +456,6 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
     return x;
 }
 
-lval* builtin_add(lenv* e, lval* a) {
-    return builtin_op(e, a, "+");
-}
-
-lval* builtin_sub(lenv* e, lval* a) {
-    return builtin_op(e, a, "-");
-}
-
-lval* builtin_mul(lenv* e, lval* a) {
-    return builtin_op(e, a, "*");
-}
-
-lval* builtin_div(lenv* e, lval* a) {
-    return builtin_op(e, a, "/");
-}
-
-lval* builtin_def(lenv* e, lval* a) {
-    return builtin_var(e, a, "def");
-}
-
-lval* builtin_put(lenv* e, lval* a) {
-    return builtin_var(e, a, "=");
-}
-
 lval* builtin_lambda(lenv* e, lval* a) {
     // check 2 args, both Q-Expressions
     LASSERT_NUM(a, "\\", 2);
@@ -573,6 +504,31 @@ lval *builtin_var(lenv* e, lval* a, char* func) {
     lval_del(a);
     return lval_sexpr();
 }
+
+lval* builtin_add(lenv* e, lval* a) {
+    return builtin_op(e, a, "+");
+}
+
+lval* builtin_sub(lenv* e, lval* a) {
+    return builtin_op(e, a, "-");
+}
+
+lval* builtin_mul(lenv* e, lval* a) {
+    return builtin_op(e, a, "*");
+}
+
+lval* builtin_div(lenv* e, lval* a) {
+    return builtin_op(e, a, "/");
+}
+
+lval* builtin_def(lenv* e, lval* a) {
+    return builtin_var(e, a, "def");
+}
+
+lval* builtin_put(lenv* e, lval* a) {
+    return builtin_var(e, a, "=");
+}
+
 
 /*
 int exit_flag = 0;
@@ -641,6 +597,52 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "-", builtin_sub);
     lenv_add_builtin(e, "*", builtin_mul);
     lenv_add_builtin(e, "/", builtin_div);
+}
+
+
+lval* lval_call(lenv* e, lval* f, lval* a) {
+    if (f->builtin) { return f->builtin(e,a); }
+
+    int given = a->count;
+    int total = f->formals->count;
+
+    // while args still left to be processed
+    while (a->count) {
+        // err check: no more formals to bind
+        if (f->formals->count == 0) {
+            lval_del(a); 
+            return lval_err("Function passed too many args. Got %i, expected %i",
+            given, total);
+        }
+
+        // pop first symbol from formals
+        lval* sym = lval_pop(f->formals, 0);
+
+        // pop next arg from the list
+        lval* val = lval_pop(a, 0);
+
+        // bind a copy into the function's env
+        lenv_put(f->env, sym, val);
+
+        // delete symbol, delete value
+        lval_del(sym);   lval_del(val);
+    }
+
+    lval_del(a);
+
+    // if all formals have been bound, evaluate
+    if (f->formals->count == 0) {
+        f->env->parent == e;
+
+        return builtin_eval(
+            f->env, lval_add(lval_sexpr(), lval_copy(f->body))
+        );
+    } 
+    // otherwise return partially evaluated function
+    else {
+        return lval_copy(f);
+    }
+
 }
 
 
