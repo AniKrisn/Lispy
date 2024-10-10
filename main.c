@@ -463,20 +463,35 @@ lval* builtin_div(lenv* e, lval* a) { return builtin_op(e, a, "/"); }
 
 
 lval* builtin_compare(lenv* e, lval* a, char* op) {
+    if (a->count != 2) {
+        lval_del(a);
+        return lval_err("Expected 2 operands, got %i", a->count);
+    }
+    
+    if (a->cell[0]->type != LVAL_NUM || a->cell[1]->type != LVAL_NUM) {
+        lval_del(a);
+        return lval_err("Cannot operate on non-number!");
+    }
+
     lval* x = lval_pop(a, 0);
     lval* y = lval_pop(a, 0);
-    int result;
 
+    int result;
     if (strcmp(op, "<") == 0) { result = (x->num < y->num) ? 1 : 0; }
     if (strcmp(op, ">") == 0) { result = (x->num > y->num) ? 1 : 0; }
+    if (strcmp(op, "==") == 0) { result = (x->num == y->num) ? 1 : 0; }
+    if (strcmp(op, "<=") == 0) { result = (x->num <= y->num) ? 1 : 0; }
+    if (strcmp(op, ">=") == 0) { result = (x->num >= y->num) ? 1 : 0; }
 
     lval_del(a); lval_del(x); lval_del(y);
     return lval_num(result);
-
 }
 
-lval* builtin_lessthan(lenv* e, lval* a) { return builtin_compare(e, a, "<"); }
-lval* builtin_greaterthan(lenv* e, lval* a) { return builtin_compare(e, a, ">"); }
+lval* builtin_less(lenv* e, lval* a) { return builtin_compare(e, a, "<"); }
+lval* builtin_great(lenv* e, lval* a) { return builtin_compare(e, a, ">"); }
+lval* builtin_eq(lenv* e, lval* a) { return builtin_compare(e, a, "=="); }
+lval* builtin_lessoreq(lenv* e, lval* a) { return builtin_compare(e, a, "<="); }
+lval* builtin_greatoreq(lenv* e, lval* a) { return builtin_compare(e, a, ">="); }
 
 
 lval* builtin_lambda(lenv* e, lval* a) {
@@ -587,8 +602,11 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "def", builtin_def);
     lenv_add_builtin(e, "\\", builtin_lambda);
     lenv_add_builtin(e, "=", builtin_put);
-    lenv_add_builtin(e, ">", builtin_greaterthan);
-    lenv_add_builtin(e, "<", builtin_lessthan);
+    lenv_add_builtin(e, ">", builtin_great);
+    lenv_add_builtin(e, "<", builtin_less);
+    lenv_add_builtin(e, "==", builtin_eq);
+    lenv_add_builtin(e, "<=", builtin_lessoreq);
+    lenv_add_builtin(e, ">=", builtin_greatoreq);
 
     lenv_add_builtin(e, "+", builtin_add);
     lenv_add_builtin(e, "-", builtin_sub);
