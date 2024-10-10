@@ -362,20 +362,34 @@ lval* builtin(lenv* e, lval* a, char* func);
 #define LASSERT_NOT_EMPTY(args, func, index) \
     LASSERT(args, args->cell[index]->count != 0, "Function '%s' passed {} for argument %i", func, index)
 
-lval* builtin_head(lenv* e, lval* a) {
-    LASSERT_NUM(a, "head", 1);
-    LASSERT_TYPE(a, "head", 0, LVAL_QEXPR);
-    LASSERT_NOT_EMPTY(a, "head", 0);
 
-    lval *v = lval_take(a, 0);
+lval* builtin_compare(lenv* e, lval* a) {
+    LASSERT_NUM(a, ">", 2);
+    LASSERT_TYPE(a, ">", 0, LVAL_NUM);
+    LASSERT_TYPE(a, ">", 1, LVAL_NUM);
+
+    int result = (a->cell[0]->num > a->cell[1]->num) ? 1 : 0;
+
+    lval_del(a);
+
+    return lval_num(result);
+}
+
+
+lval* builtin_head(lenv* e, lval* a) {
+    LASSERT_NOT_EMPTY(a, "head", 0);
+    LASSERT_TYPE(a, "head", 0, LVAL_QEXPR);
+    LASSERT_NUM(a, "head", 1);
+
+    lval* v = lval_take(a, 0);
     while (v->count > 1) { lval_del(lval_pop(v, 1)); }
     return v;
 }
 
 lval* builtin_tail(lenv* e, lval* a) {
-    LASSERT_NUM(a, "tail", 1);
     LASSERT_NOT_EMPTY(a, "tail", 0);
     LASSERT_TYPE(a, "tail", 0, LVAL_QEXPR);
+    LASSERT_NUM(a, "tail", 1);
 
     lval* v = lval_take(a, 0);
     lval_del(lval_pop(v,0));
@@ -388,8 +402,8 @@ lval* builtin_list(lenv* e, lval* a) {
 }
 
 lval* builtin_eval(lenv* e, lval* a) {
-    LASSERT_NUM(a, "eval", 1);
     LASSERT_TYPE(a, "eval", 0, LVAL_QEXPR);
+    LASSERT_NUM(a, "eval", 1);
 
     lval* x = lval_take(a, 0);
     x->type = LVAL_SEXPR;
@@ -455,7 +469,6 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
     return x;
 }
 
-lval* builtin_compare(lenv* e, lval* a) {}
 
 
 lval* builtin_add(lenv* e, lval* a) { return builtin_op(e, a, "+"); }
@@ -572,6 +585,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "def", builtin_def);
     lenv_add_builtin(e, "\\", builtin_lambda);
     lenv_add_builtin(e, "=", builtin_put);
+    lenv_add_builtin(e, ">", builtin_compare);
 
     lenv_add_builtin(e, "+", builtin_add);
     lenv_add_builtin(e, "-", builtin_sub);
