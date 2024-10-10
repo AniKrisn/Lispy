@@ -535,12 +535,28 @@ int lval_eq(lval* x, lval* y) {
     return 0;
 }
 
+lval* builtin_cmp(lenv* e, lval* a, char* op) {
+    LASSERT(a, op, 2);
+    lval* x = lval_pop(a, 0);
+    lval* y = lval_pop(a, 0);
+    int result;
+    if (strcmp(op, "==") == 0) {
+        result = lval_eq(x, y);
+    }
+    if (strcmp(op, "!=") == 0) {
+        result = !lval_eq(x, y);
+    }
+    lval_del(a); lval_del(x); lval_del(y);
+    return lval_num(result);
+}
+
 
 lval* builtin_less(lenv* e, lval* a) { return builtin_compare(e, a, "<"); }
 lval* builtin_great(lenv* e, lval* a) { return builtin_compare(e, a, ">"); }
-lval* builtin_eq(lenv* e, lval* a) { return builtin_compare(e, a, "=="); }
 lval* builtin_lessoreq(lenv* e, lval* a) { return builtin_compare(e, a, "<="); }
 lval* builtin_greatoreq(lenv* e, lval* a) { return builtin_compare(e, a, ">="); }
+lval* builtin_eq(lenv* e, lval* a) { return builtin_eqcmp(e, a, "=="); }
+lval* builtin_neq(lenv* e, lval* a) { return builtin_eqcmp(e, a, "!="); }
 
 
 
@@ -655,6 +671,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, ">", builtin_great);
     lenv_add_builtin(e, "<", builtin_less);
     lenv_add_builtin(e, "==", builtin_eq);
+    lenv_add_builtin(e, "!=", builtin_neq);
     lenv_add_builtin(e, "<=", builtin_lessoreq);
     lenv_add_builtin(e, ">=", builtin_greatoreq);
     lenv_add_builtin(e, "if", builtin_if);
