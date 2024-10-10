@@ -357,11 +357,10 @@ lval* builtin(lenv* e, lval* a, char* func);
 
 #define LASSERT_NUM(args, func, expected) \
     LASSERT(args, args->count == expected, \
-    "Function '%s' passed incorrect type. Got %s, expected %s.", func, args->count, expected) 
+    "Function '%s' passed incorrect num of args. Got %i, expected %i.", func, args->count, expected) 
 
 #define LASSERT_NOT_EMPTY(args, func, index) \
     LASSERT(args, args->cell[index]->count != 0, "Function '%s' passed {} for argument %i", func, index)
-
 
 lval* builtin_head(lenv* e, lval* a) {
     LASSERT_NUM(a, "head", 1);
@@ -456,6 +455,9 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
     return x;
 }
 
+lval* builtin_compare(lenv* e, lval* a) {}
+
+
 lval* builtin_add(lenv* e, lval* a) { return builtin_op(e, a, "+"); }
 lval* builtin_sub(lenv* e, lval* a) { return builtin_op(e, a, "-"); }
 lval* builtin_mul(lenv* e, lval* a) { return builtin_op(e, a, "*"); }
@@ -510,6 +512,7 @@ lval *builtin_var(lenv* e, lval* a, char* func) {
     lval_del(a);
     return lval_sexpr();
 }
+
 
 lval* builtin_def(lenv* e, lval* a) { return builtin_var(e, a, "def"); }
 lval* builtin_put(lenv* e, lval* a) { return builtin_var(e, a, "="); }
