@@ -499,13 +499,42 @@ lval* builtin_compare(lenv* e, lval* a, char* op) {
     int result;
     if (strcmp(op, "<") == 0) { result = (x->num < y->num) ? 1 : 0; }
     if (strcmp(op, ">") == 0) { result = (x->num > y->num) ? 1 : 0; }
-    if (strcmp(op, "==") == 0) { result = (x->num == y->num) ? 1 : 0; }
     if (strcmp(op, "<=") == 0) { result = (x->num <= y->num) ? 1 : 0; }
     if (strcmp(op, ">=") == 0) { result = (x->num >= y->num) ? 1 : 0; }
 
     lval_del(a); lval_del(x); lval_del(y);
     return lval_num(result);
 }
+
+int lval_eq(lval* x, lval* y) {
+    if (x->type != y->type) { return 0; }
+
+    switch(x->type) {
+        case LVAL_NUM: return (x->num == y->num);
+
+        case LVAL_ERR: return (strcmp(x->err, y->err) == 0);
+        case LVAL_SYM: return (strcmp(x->sym, y->sym) == 0);
+
+        case LVAL_FUN:
+            if (x->builtin || y->builtin) {
+                return x->builtin == y->builtin;
+            } else {
+                return lval_eq(x->formals, y-> formals) && lval_eq(x->body, y->body);
+            }
+
+        case LVAL_QEXPR:
+        case LVAL_SEXPR:
+            if (x->count != y->count) { return 0; }
+            for (int i = 0; i < x->count; i++) {
+                if (!lval_eq(x->cell[i], y->cell[i])) { return 0; }
+            }
+        return 1;
+    break;
+    }
+
+    return 0;
+}
+
 
 lval* builtin_less(lenv* e, lval* a) { return builtin_compare(e, a, "<"); }
 lval* builtin_great(lenv* e, lval* a) { return builtin_compare(e, a, ">"); }
