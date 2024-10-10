@@ -536,7 +536,7 @@ int lval_eq(lval* x, lval* y) {
 }
 
 lval* builtin_cmp(lenv* e, lval* a, char* op) {
-    LASSERT(a, op, 2);
+    LASSERT_NUM(a, op, 2);
     lval* x = lval_pop(a, 0);
     lval* y = lval_pop(a, 0);
     int result;
@@ -555,8 +555,8 @@ lval* builtin_less(lenv* e, lval* a) { return builtin_compare(e, a, "<"); }
 lval* builtin_great(lenv* e, lval* a) { return builtin_compare(e, a, ">"); }
 lval* builtin_lessoreq(lenv* e, lval* a) { return builtin_compare(e, a, "<="); }
 lval* builtin_greatoreq(lenv* e, lval* a) { return builtin_compare(e, a, ">="); }
-lval* builtin_eq(lenv* e, lval* a) { return builtin_eqcmp(e, a, "=="); }
-lval* builtin_neq(lenv* e, lval* a) { return builtin_eqcmp(e, a, "!="); }
+lval* builtin_eq(lenv* e, lval* a) { return builtin_cmp(e, a, "=="); }
+lval* builtin_neq(lenv* e, lval* a) { return builtin_cmp(e, a, "!="); }
 
 
 
