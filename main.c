@@ -645,6 +645,13 @@ void lval_expr_print(lval* v, char open, char close) {
     putchar(close);
 }
 
+void lval_print_str(lval* v) {
+    char* escaped = malloc(strlen(v->str)+1);
+    strcpy(escaped, v->str);
+    escaped = mpcf_escape(escaped);
+    printf("\"%s\"", escaped);
+    free(escaped);
+}
 
 void lval_print(lval* v) {
     switch (v->type) {
@@ -678,25 +685,29 @@ void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
 }
 
 void lenv_add_builtins(lenv* e) {
+    /* Variable Functions */
+    lenv_add_builtin(e, "\\", builtin_lambda);
+    lenv_add_builtin(e, "def", builtin_def);
+    lenv_add_builtin(e, "=", builtin_put);
+    /* List Functions */
     lenv_add_builtin(e, "list", builtin_list);
     lenv_add_builtin(e, "head", builtin_head);
     lenv_add_builtin(e, "tail", builtin_tail);
     lenv_add_builtin(e, "eval", builtin_eval);
     lenv_add_builtin(e, "join", builtin_join);
-    lenv_add_builtin(e, "def", builtin_def);
-    lenv_add_builtin(e, "\\", builtin_lambda);
-    lenv_add_builtin(e, "=", builtin_put);
-    lenv_add_builtin(e, ">", builtin_great);
-    lenv_add_builtin(e, "<", builtin_less);
-    lenv_add_builtin(e, "==", builtin_eq);
-    lenv_add_builtin(e, "!=", builtin_neq);
-    lenv_add_builtin(e, "<=", builtin_lessoreq);
-    lenv_add_builtin(e, ">=", builtin_greatoreq);
-    lenv_add_builtin(e, "if", builtin_if);
+    /* Arithmetic Functions */
     lenv_add_builtin(e, "+", builtin_add);
     lenv_add_builtin(e, "-", builtin_sub);
     lenv_add_builtin(e, "*", builtin_mul);
     lenv_add_builtin(e, "/", builtin_div);
+    /* Compare Functions */
+    lenv_add_builtin(e, "if", builtin_if);
+    lenv_add_builtin(e, "==", builtin_eq);
+    lenv_add_builtin(e, "!=", builtin_neq);
+    lenv_add_builtin(e, ">", builtin_great);
+    lenv_add_builtin(e, "<", builtin_less);
+    lenv_add_builtin(e, "<=", builtin_lessoreq);
+    lenv_add_builtin(e, ">=", builtin_greatoreq);
 }
 
 
@@ -835,7 +846,7 @@ lval* lval_read_num(mpc_ast_t* t) {
 
 lval* lval_read_str(mpc_ast_t* t) {
     // remove final quote char
-    t->contents[strlen(t->contents)-1] = '\0'
+    t->contents[strlen(t->contents)-1] = '\0';
     // copy string without first quote char
     char* unescaped = malloc(strlen(t->contents+1)+1);
     strcpy(unescaped, t->contents+1);
@@ -883,6 +894,7 @@ int main (int argc, char** argv) {
 
     mpc_parser_t* Number = mpc_new("number");
     mpc_parser_t* Symbol = mpc_new("symbol");
+    mpc_parser_t* String = mpc_new("string");
     mpc_parser_t* Sexpr  = mpc_new("sexpr");
     mpc_parser_t* Qexpr  = mpc_new("qexpr");
     mpc_parser_t* Expr   = mpc_new("expr");
@@ -892,13 +904,13 @@ int main (int argc, char** argv) {
     "                                                       \
         number : /-?[0-9]+/ ;                               \
         symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;         \
-        string  : /\"(\\\\.|[^\"])*\"/ ;                    \
+        string : /\"(\\\\.|[^\"])*\"/ ;                     \
         sexpr  : '(' <expr>* ')' ;                          \
         qexpr  : '{' <expr>* '}' ;                          \
         expr   : <number> | <symbol> | <sexpr> | <qexpr> ;  \
         lispy  : /^/ <expr>* /$/ ;                          \
     ",
-    Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
+    Number, Symbol, String, Sexpr, Qexpr, Expr, Lispy);
 
 
     lenv* e = lenv_new();
@@ -937,7 +949,7 @@ int main (int argc, char** argv) {
     }
 
     lenv_del(e);
-    mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
+    mpc_cleanup(6, Number, Symbol, String, Sexpr, Qexpr, Expr, Lispy);
     // undefine and delete the parsers
 
     return 0;
