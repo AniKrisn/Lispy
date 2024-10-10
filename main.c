@@ -1,10 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "mpc.h"
 
 #ifdef _WIN32
 #include <string.h>
-
 
 static char buffer[2048];
 
@@ -20,9 +17,7 @@ char* readline(char* prompt) {
     return strdup(buffer);  // Create a new copy and return it
 }
 
-
 void add_history(char* unused) {}
-
 
 #else 
 #include <editline/readline.h>
@@ -659,6 +654,8 @@ void lval_print(lval* v) {
         case LVAL_ERR: printf("Error: %s", v->err); break;
         case LVAL_SYM: printf("%s", v->sym); break;
         case LVAL_STR: lval_print_str(v); break;
+        case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
+        case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
         case LVAL_FUN: 
             if (v->builtin) {
                 printf("<builtin>");
@@ -668,8 +665,6 @@ void lval_print(lval* v) {
                 putchar(' '); lval_print(v->body); putchar(')');
             }
             break;
-        case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
-        case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
     }
 }
 
@@ -904,10 +899,11 @@ int main (int argc, char** argv) {
     "                                                       \
         number : /-?[0-9]+/ ;                               \
         symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;         \
-        string : /\"(\\\\.|[^\"])*\"/ ;                     \
+        string  : /\"(\\\\.|[^\"])*\"/ ;                    \
         sexpr  : '(' <expr>* ')' ;                          \
         qexpr  : '{' <expr>* '}' ;                          \
-        expr   : <number> | <symbol> | <sexpr> | <qexpr> ;  \
+        expr   : <number> | <symbol> | <string>             \
+        | <sexpr> | <qexpr> ;                               \
         lispy  : /^/ <expr>* /$/ ;                          \
     ",
     Number, Symbol, String, Sexpr, Qexpr, Expr, Lispy);
@@ -949,7 +945,7 @@ int main (int argc, char** argv) {
     }
 
     lenv_del(e);
-    mpc_cleanup(6, Number, Symbol, String, Sexpr, Qexpr, Expr, Lispy);
+    mpc_cleanup(7, Number, Symbol, String, Sexpr, Qexpr, Expr, Lispy);
     // undefine and delete the parsers
 
     return 0;
