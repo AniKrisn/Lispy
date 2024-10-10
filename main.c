@@ -35,7 +35,7 @@ typedef struct lval lval;
 typedef struct lenv lenv;
 
 // possible lval types
-enum { LVAL_ERR, LVAL_NUM, LVAL_SYM,
+enum { LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_STR,
        LVAL_FUN, LVAL_SEXPR, LVAL_QEXPR };
 
 typedef lval*(*lbuiltin)(lenv*, lval*);
@@ -44,14 +44,16 @@ typedef lval*(*lbuiltin)(lenv*, lval*);
 struct lval {
     int type;
     long num;
-    // err and symbol types have string data
+
     char* err;
     char* sym;
+    char* str;
+
     lbuiltin builtin;   
     lenv* env;
     lval* formals;
     lval* body;
-    // count and point to a list of "lval*"
+
     int count;
     lval** cell;
 };
@@ -89,6 +91,7 @@ char* ltype_name(int t) {
         case LVAL_NUM: return "Number";
         case LVAL_ERR: return "Error";
         case LVAL_SYM: return "Symbol";
+        case LVAL_STR: return "String";
         case LVAL_SEXPR: return "S-Expression";
         case LVAL_QEXPR: return "Q-Expression";
         default: return "Unknown";
@@ -100,6 +103,14 @@ lval* lval_sym(char* s) {
     v->type = LVAL_SYM;
     v->sym = malloc(strlen(s) + 1);
     strcpy(v->sym, s);
+    return v;
+}
+
+lval* lval_str(char* s) {
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_STR;
+    v->str = malloc(strlen(s) + 1);
+    strcpy(v->str, s);
     return v;
 }
 
@@ -150,6 +161,7 @@ void lval_del(lval* v) {
         // err and sym are strings so freeing is straightforward
         case LVAL_ERR: free(v->err); break;
         case LVAL_SYM: free(v->sym); break;
+        case LVAL_STR: free(v->str); break;
         // sexprs are lists so we need to free each element and then the mem used to store the pointers
         case LVAL_QEXPR:
         case LVAL_SEXPR:
@@ -218,6 +230,10 @@ lval* lval_copy(lval* v) {
         case LVAL_SYM:
             x->sym = malloc(strlen(v->sym)+1);
             strcpy(x->sym, v->sym); break;
+
+        case LVAL_STR:
+            x->str = malloc(strlen(v->str)+1);
+            strcpy(x->str, v->str); break;
 
         case LVAL_SEXPR:
         case LVAL_QEXPR:
@@ -514,6 +530,7 @@ int lval_eq(lval* x, lval* y) {
 
         case LVAL_ERR: return (strcmp(x->err, y->err) == 0);
         case LVAL_SYM: return (strcmp(x->sym, y->sym) == 0);
+        case LVAL_STR: return (strcmp(x->str, y->str) == 0);
 
         case LVAL_FUN:
             if (x->builtin || y->builtin) {
@@ -628,12 +645,13 @@ void lval_expr_print(lval* v, char open, char close) {
     putchar(close);
 }
 
-// print an lval
+
 void lval_print(lval* v) {
     switch (v->type) {
         case LVAL_NUM: printf("%li", v->num); break;
         case LVAL_ERR: printf("Error: %s", v->err); break;
         case LVAL_SYM: printf("%s", v->sym); break;
+        case LVAL_STR: lval_print_str(v); break;
         case LVAL_FUN: 
             if (v->builtin) {
                 printf("<builtin>");
@@ -648,7 +666,7 @@ void lval_print(lval* v) {
     }
 }
 
-// print an lval followed by a newline
+
 void lval_println(lval* v) { lval_print(v); putchar('\n'); }
 
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
