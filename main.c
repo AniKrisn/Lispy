@@ -631,6 +631,7 @@ lval *builtin_var(lenv* e, lval* a, char* func) {
 lval* builtin_def(lenv* e, lval* a) { return builtin_var(e, a, "def"); }
 lval* builtin_put(lenv* e, lval* a) { return builtin_var(e, a, "="); }
 
+// load and read other files
 lval* builtin_load(lenv* e, lval* a) {
   LASSERT_NUM("load", a, 1);
   LASSERT_TYPE("load", a, 0, LVAL_STR);
@@ -641,9 +642,9 @@ lval* builtin_load(lenv* e, lval* a) {
     lval* expr = lval_read(r.output);
     mpc_ast_delete(r.output);
 
+    // deal with each new expr
     while (expr->count) {
       lval* x = lval_eval(e, lval_pop(expr, 0));
-      /* If Evaluation leads to error print it */
       if (x->type == LVAL_ERR) { lval_println(x); }
       lval_del(x);
     }
@@ -663,6 +664,27 @@ lval* builtin_load(lenv* e, lval* a) {
 
     return err;
   }
+}
+
+lval* builtin_print(lenv* e, lval* a) {
+  for (int i = 0; i < a->count; i++) {
+    lval_print(a->cell[i]); putchar(' ');
+  }
+
+  putchar('\n');
+  lval_del(a);
+
+  return lval_sexpr();
+}
+
+lval* builtin_error(lenv* e, lval* a) {
+  LASSERT_NUM("error", a, 1);
+  LASSERT_TYPE("error", a, 0, LVAL_STR);
+  
+  lval* err = lval_err(a->cell[0]->str);
+  
+  lval_del(a);
+  return err;
 }
 
 // forward declaration, allows us to use lval_print before it is defined: sometimes lval_expr_print needs it
@@ -743,6 +765,9 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "<", builtin_less);
     lenv_add_builtin(e, "<=", builtin_lessoreq);
     lenv_add_builtin(e, ">=", builtin_greatoreq);
+    /* Command line functions */
+    lenv_add_builtin(e, "load", builtin_load);
+    lenv_add_builtin(e, "print", builtin_print);
 }
 
 
