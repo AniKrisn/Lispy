@@ -363,19 +363,6 @@ lval* builtin(lenv* e, lval* a, char* func);
     LASSERT(args, args->cell[index]->count != 0, "Function '%s' passed {} for argument %i", func, index)
 
 
-lval* builtin_compare(lenv* e, lval* a) {
-    LASSERT_NUM(a, ">", 2);
-    LASSERT_TYPE(a, ">", 0, LVAL_NUM);
-    LASSERT_TYPE(a, ">", 1, LVAL_NUM);
-
-    int result = (a->cell[0]->num > a->cell[1]->num) ? 1 : 0;
-
-    lval_del(a);
-
-    return lval_num(result);
-}
-
-
 lval* builtin_head(lenv* e, lval* a) {
     LASSERT_NOT_EMPTY(a, "head", 0);
     LASSERT_TYPE(a, "head", 0, LVAL_QEXPR);
@@ -469,12 +456,27 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
     return x;
 }
 
-
-
 lval* builtin_add(lenv* e, lval* a) { return builtin_op(e, a, "+"); }
 lval* builtin_sub(lenv* e, lval* a) { return builtin_op(e, a, "-"); }
 lval* builtin_mul(lenv* e, lval* a) { return builtin_op(e, a, "*"); }
 lval* builtin_div(lenv* e, lval* a) { return builtin_op(e, a, "/"); }
+
+
+lval* builtin_compare(lenv* e, lval* a, char* op) {
+    lval* x = lval_pop(a, 0);
+    lval* y = lval_pop(a, 0);
+    int result;
+
+    if (strcmp(op, "<") == 0) { result = (x->num < y->num) ? 1 : 0; }
+    if (strcmp(op, ">") == 0) { result = (x->num > y->num) ? 1 : 0; }
+
+    lval_del(a); lval_del(x); lval_del(y);
+    return lval_num(result);
+
+}
+
+lval* builtin_lessthan(lenv* e, lval* a) { return builtin_compare(e, a, "<"); }
+lval* builtin_greaterthan(lenv* e, lval* a) { return builtin_compare(e, a, ">"); }
 
 
 lval* builtin_lambda(lenv* e, lval* a) {
@@ -585,7 +587,8 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "def", builtin_def);
     lenv_add_builtin(e, "\\", builtin_lambda);
     lenv_add_builtin(e, "=", builtin_put);
-    lenv_add_builtin(e, ">", builtin_compare);
+    lenv_add_builtin(e, ">", builtin_greaterthan);
+    lenv_add_builtin(e, "<", builtin_lessthan);
 
     lenv_add_builtin(e, "+", builtin_add);
     lenv_add_builtin(e, "-", builtin_sub);
