@@ -833,12 +833,25 @@ lval* lval_read_num(mpc_ast_t* t) {
     return errno != ERANGE ? lval_num(x) : lval_err("invalid number");
 }
 
+lval* lval_read_str(mpc_ast_t* t) {
+    // remove final quote char
+    t->contents[strlen(t->contents)-1] = '\0'
+    // copy string without first quote char
+    char* unescaped = malloc(strlen(t->contents+1)+1);
+    strcpy(unescaped, t->contents+1);
+    // pass through the unescape fn
+    unescaped = mpcf_unescape(unescaped);
+    lval* str = lval_str(unescaped);
+    free(unescaped);
+    return str;
+}
 
 lval* lval_read(mpc_ast_t* t) {
 
     // if the tag is a number or sym return a pointer to a num lval
     if (strstr(t->tag, "number")) {return lval_read_num(t);}
     if (strstr(t->tag, "symbol")) {return lval_sym(t->contents);}
+    if (strstr(t->tag, "string")) { return lval_read_str(t); }
 
     lval* x = NULL;
     // ">" is the root of the expression in the AST. If root or sexpr, create empty list
@@ -879,6 +892,7 @@ int main (int argc, char** argv) {
     "                                                       \
         number : /-?[0-9]+/ ;                               \
         symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;         \
+        string  : /\"(\\\\.|[^\"])*\"/ ;                    \
         sexpr  : '(' <expr>* ')' ;                          \
         qexpr  : '{' <expr>* '}' ;                          \
         expr   : <number> | <symbol> | <sexpr> | <qexpr> ;  \
