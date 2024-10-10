@@ -288,7 +288,7 @@ lenv* lenv_copy(lenv* e) {
     n->syms = malloc(sizeof(char*) * n->count);
     n->vals = malloc(sizeof(lval*) * n->count);
     for (int i = 0; i < e->count; i++) {
-        n->syms[i] = malloc(strlen(e->syms[i]) + 1 );
+        n->syms[i] = malloc(strlen(e->syms[i]) + 1);
         strcpy(n->syms[i], e->syms[i]);
         n->vals[i] = lval_copy(e->vals[i]);
     }
@@ -306,7 +306,7 @@ lval* lenv_get(lenv* e, lval* k) {
     if (e->parent) {
         return lenv_get(e->parent, k);
     } else {
-        return lval_err("unbound symbol!");
+        return lval_err("Unbound symbol '%s'", k->sym);
     }
 }
 
@@ -456,6 +456,12 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
     return x;
 }
 
+lval* builtin_add(lenv* e, lval* a) { return builtin_op(e, a, "+"); }
+lval* builtin_sub(lenv* e, lval* a) { return builtin_op(e, a, "-"); }
+lval* builtin_mul(lenv* e, lval* a) { return builtin_op(e, a, "*"); }
+lval* builtin_div(lenv* e, lval* a) { return builtin_op(e, a, "/"); }
+
+
 lval* builtin_lambda(lenv* e, lval* a) {
     // check 2 args, both Q-Expressions
     LASSERT_NUM(a, "\\", 2);
@@ -505,30 +511,8 @@ lval *builtin_var(lenv* e, lval* a, char* func) {
     return lval_sexpr();
 }
 
-lval* builtin_add(lenv* e, lval* a) {
-    return builtin_op(e, a, "+");
-}
-
-lval* builtin_sub(lenv* e, lval* a) {
-    return builtin_op(e, a, "-");
-}
-
-lval* builtin_mul(lenv* e, lval* a) {
-    return builtin_op(e, a, "*");
-}
-
-lval* builtin_div(lenv* e, lval* a) {
-    return builtin_op(e, a, "/");
-}
-
-lval* builtin_def(lenv* e, lval* a) {
-    return builtin_var(e, a, "def");
-}
-
-lval* builtin_put(lenv* e, lval* a) {
-    return builtin_var(e, a, "=");
-}
-
+lval* builtin_def(lenv* e, lval* a) { return builtin_var(e, a, "def"); }
+lval* builtin_put(lenv* e, lval* a) { return builtin_var(e, a, "="); }
 
 // forward declaration, allows us to use lval_print before it is defined: sometimes lval_expr_print needs it
 void lval_print(lval* v);
@@ -656,7 +640,7 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
 
     // if all formals have been bound, evaluate
     if (f->formals->count == 0) {
-        f->env->parent == e;
+        f->env->parent = e;
 
         return builtin_eval(
             f->env, lval_add(lval_sexpr(), lval_copy(f->body))
@@ -699,7 +683,7 @@ lval* lval_eval_sexpr(lenv* e, lval* v) {
         return err;
     }
 
-    lval* result = f->builtin(e, v);
+    lval* result = lval_call(e, f, v);
     lval_del(f);
     return result;
 }
@@ -769,7 +753,7 @@ int main (int argc, char** argv) {
     mpc_parser_t* Lispy  = mpc_new("lispy");
 
     mpca_lang(MPCA_LANG_DEFAULT,
-    "                                                     \
+    "                                                       \
         number : /-?[0-9]+/ ;                               \
         symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;         \
         sexpr  : '(' <expr>* ')' ;                          \
