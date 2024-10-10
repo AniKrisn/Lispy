@@ -1,2 +1,2 @@
-# Lisp Compiler in C
+# Lisp Interpreter in C
 from https://www.buildyourownlisp.com/
