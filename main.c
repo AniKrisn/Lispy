@@ -24,6 +24,16 @@ void add_history(char* unused) {}
 #include <editline/history.h>
 #endif
 
+/* Parser Declarations */
+mpc_parser_t* Number;
+mpc_parser_t* Symbol;
+mpc_parser_t* String;
+mpc_parser_t* Comment;
+mpc_parser_t* Sexpr;
+mpc_parser_t* Qexpr;
+mpc_parser_t* Expr;
+mpc_parser_t* Lispy;
+
 struct lval;
 struct lenv;
 typedef struct lval lval;
@@ -562,15 +572,12 @@ lval* builtin_cmp(lenv* e, lval* a, char* op) {
     return lval_num(result);
 }
 
-
 lval* builtin_less(lenv* e, lval* a) { return builtin_compare(e, a, "<"); }
 lval* builtin_great(lenv* e, lval* a) { return builtin_compare(e, a, ">"); }
 lval* builtin_lessoreq(lenv* e, lval* a) { return builtin_compare(e, a, "<="); }
 lval* builtin_greatoreq(lenv* e, lval* a) { return builtin_compare(e, a, ">="); }
 lval* builtin_eq(lenv* e, lval* a) { return builtin_cmp(e, a, "=="); }
 lval* builtin_neq(lenv* e, lval* a) { return builtin_cmp(e, a, "!="); }
-
-
 
 lval* builtin_lambda(lenv* e, lval* a) {
     // check 2 args, both Q-Expressions
@@ -621,9 +628,42 @@ lval *builtin_var(lenv* e, lval* a, char* func) {
     return lval_sexpr();
 }
 
-
 lval* builtin_def(lenv* e, lval* a) { return builtin_var(e, a, "def"); }
 lval* builtin_put(lenv* e, lval* a) { return builtin_var(e, a, "="); }
+
+lval* builtin_load(lenv* e, lval* a) {
+  LASSERT_NUM("load", a, 1);
+  LASSERT_TYPE("load", a, 0, LVAL_STR);
+
+  mpc_result_t r;
+  if (mpc_parse_contents(a->cell[0]->str, Lispy, &r)) {
+
+    lval* expr = lval_read(r.output);
+    mpc_ast_delete(r.output);
+
+    while (expr->count) {
+      lval* x = lval_eval(e, lval_pop(expr, 0));
+      /* If Evaluation leads to error print it */
+      if (x->type == LVAL_ERR) { lval_println(x); }
+      lval_del(x);
+    }
+
+    lval_del(expr);
+    lval_del(a);
+
+    return lval_sexpr();
+
+  } else {
+    char* err_msg = mpc_err_string(r.error);
+    mpc_err_delete(r.error);
+
+    lval* err = lval_err("Could not load Library %s", err_msg);
+    free(err_msg);
+    lval_del(a);
+
+    return err;
+  }
+}
 
 // forward declaration, allows us to use lval_print before it is defined: sometimes lval_expr_print needs it
 void lval_print(lval* v);
@@ -876,6 +916,7 @@ lval* lval_read(mpc_ast_t* t) {
         if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
         if (strcmp(t->children[i]->contents, "}") == 0) { continue; }        
         if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
+        if (strcmp(t->children[i]->tag,  "comment") == 0) { continue; }
 
         lval* child = lval_read(t->children[i]);
         x = lval_add(x, child);
@@ -890,6 +931,7 @@ int main (int argc, char** argv) {
     mpc_parser_t* Number = mpc_new("number");
     mpc_parser_t* Symbol = mpc_new("symbol");
     mpc_parser_t* String = mpc_new("string");
+    mpc_parser_t* Comment = mpc_new("comment");
     mpc_parser_t* Sexpr  = mpc_new("sexpr");
     mpc_parser_t* Qexpr  = mpc_new("qexpr");
     mpc_parser_t* Expr   = mpc_new("expr");
@@ -900,13 +942,14 @@ int main (int argc, char** argv) {
         number : /-?[0-9]+/ ;                               \
         symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;         \
         string  : /\"(\\\\.|[^\"])*\"/ ;                    \
+        comment : /;[^\\r\\n]*/ ;                           \
         sexpr  : '(' <expr>* ')' ;                          \
         qexpr  : '{' <expr>* '}' ;                          \
         expr   : <number> | <symbol> | <string>             \
         | <sexpr> | <qexpr> ;                               \
         lispy  : /^/ <expr>* /$/ ;                          \
     ",
-    Number, Symbol, String, Sexpr, Qexpr, Expr, Lispy);
+    Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Lispy);
 
 
     lenv* e = lenv_new();
@@ -945,7 +988,9 @@ int main (int argc, char** argv) {
     }
 
     lenv_del(e);
-    mpc_cleanup(7, Number, Symbol, String, Sexpr, Qexpr, Expr, Lispy);
+    mpc_cleanup(8,
+    Number, Symbol, String, Comment,
+    Sexpr, Qexpr, Expr, Lispy);
     // undefine and delete the parsers
 
     return 0;
