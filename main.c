@@ -765,9 +765,10 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "<", builtin_less);
     lenv_add_builtin(e, "<=", builtin_lessoreq);
     lenv_add_builtin(e, ">=", builtin_greatoreq);
-    /* Command line functions */
+    /* String functions */
     lenv_add_builtin(e, "load", builtin_load);
     lenv_add_builtin(e, "print", builtin_print);
+    lenv_add_builtin(e, "error", builtin_error);
 }
 
 
@@ -1010,6 +1011,22 @@ int main (int argc, char** argv) {
         // if successful, eval & print, else error
 
         free(input);
+    }
+
+    // add other files
+    if (argc >= 2) {
+        // loop over each supplied filename
+        for (int i = 0; i < argc; i++) {
+            // args list with a single arg: the filename
+            lval* args = lval_add(lval_sexpr(), lval_str(argv[i]));
+            // pass this to load fn
+            lval* x = builtin_load(e, args);
+            
+            if (x->type == LVAL_ERR) { lval_println(x); }
+            lval_del(x);
+        }
+
+
     }
 
     lenv_del(e);
